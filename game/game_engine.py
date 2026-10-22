@@ -28,6 +28,8 @@ class GameEngine:
         self.won=False
         self.top_y=self.platforms[-1].y
         self.frame=0
+        self.crumble_timers = {}
+        
 
     def handle_events(self):
         for event in pygame.event.get():
@@ -38,7 +40,38 @@ class GameEngine:
     def update(self):
         if self.game_over or self.won: return
         keys=pygame.key.get_pressed()
-        self.player.update(keys,self.platforms,WIDTH)
+        self.player.update(keys, self.platforms, WIDTH)
+
+        # Detect which platform the player has landed on.
+        if self.player.on_ground:
+            for platform in self.platforms:
+                if (
+                    self.player.rect.bottom == platform.top
+                    and self.player.rect.right > platform.left
+                    and self.player.rect.left < platform.right
+                ):
+                    # The ground never crumbles.
+                    if platform.top != GROUND_Y:
+                        platform_id = id(platform)
+
+                        # Only some platforms crumble.
+                        if platform_id not in self.crumble_timers:
+                            import random
+                            if random.random() < 0.25:
+                                self.crumble_timers[platform_id] = 0
+                    break
+
+        # Advance timers and remove platforms after 45 frames.
+        for platform in self.platforms[1:]:
+            platform_id = id(platform)
+
+            if platform_id in self.crumble_timers:
+                self.crumble_timers[platform_id] += 1
+
+                if self.crumble_timers[platform_id] >= 45:
+                    self.platforms.remove(platform)
+                    del self.crumble_timers[platform_id]
+                    break
         target=self.player.rect.centery-HEIGHT//2
         if target<self.cam_y: self.cam_y=target
         self.lava_y-=self.lava_rise
@@ -53,8 +86,25 @@ class GameEngine:
     def draw(self):
         self.screen.fill(BG)
         for p in self.platforms:
-            dr=p.move(0,-int(self.cam_y))
-            pygame.draw.rect(self.screen,PLATFORM_COLOR,dr,border_radius=4)
+            offset_x = 0
+            platform_id = id(p)
+
+            if platform_id in self.crumble_timers:
+                import math
+                offset_x = int(math.sin(self.frame * 2) * 3)
+
+            dr = p.move(offset_x, -int(self.cam_y))
+
+            color = PLATFORM_COLOR
+            if platform_id in self.crumble_timers:
+                color = (220, 170, 60)
+
+            pygame.draw.rect(
+                self.screen,
+                color,
+                dr,
+                border_radius=4,
+            )
         self.player.draw(self.screen,self.cam_y)
         draw_lava(self.screen,self.lava_y,self.cam_y,WIDTH,HEIGHT,self.frame)
         sc=self.font.render(f"Height: {self.score}m  R=Restart",True,(220,200,180))
