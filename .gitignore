@@ -1,0 +1,6 @@
+.venv/
+__pycache__/
+*.pyc
+*.save
+*.broken-backup
+game/world.py8
