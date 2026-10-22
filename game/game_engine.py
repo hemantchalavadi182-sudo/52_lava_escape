@@ -27,6 +27,10 @@ class GameEngine:
         self.cam_y = 0
         self.lava_y = GROUND_Y + 60
         self.lava_rise = 0.4
+        self.surge_timer = 0
+        self.surge_duration = 180
+        self.surge_interval = 600
+        self.surge_active = False
         self.score = 0
         self.game_over = False
         self.won = False
@@ -86,7 +90,24 @@ class GameEngine:
         if target < self.cam_y:
             self.cam_y = target
 
-        self.lava_y -= self.lava_rise
+                # Trigger a lava surge periodically.
+        self.surge_timer += 1
+
+        if self.surge_timer >= self.surge_interval:
+            self.surge_timer = 0
+            self.surge_active = True
+
+        if self.surge_active:
+            self.lava_y -= self.lava_rise * 2.5
+            self.surge_duration -= 1
+
+            if self.surge_duration <= 0:
+                self.surge_active = False
+                self.surge_duration = 180
+                self.surge_interval = random.randint(480, 720)
+        else:
+            self.lava_y -= self.lava_rise
+
         self.lava_rise = min(1.2, self.lava_rise + 0.0003)
         self.score = max(0, (GROUND_Y - self.player.rect.y) // 10)
         self.frame += 1
@@ -126,6 +147,33 @@ class GameEngine:
             f"Height: {self.score}m  R=Restart", True, (220, 200, 180)
         )
         self.screen.blit(label, (8, 10))
+        # Danger meter based on the lava's distance from the player.
+        distance = self.player.rect.bottom - self.lava_y
+        danger = max(0, min(100, int(100 - distance / 5)))
+
+        meter_x, meter_y = 10, 45
+        meter_width, meter_height = 200, 18
+
+        pygame.draw.rect(
+            self.screen, (70, 70, 70),
+            (meter_x, meter_y, meter_width, meter_height)
+        )
+
+        pygame.draw.rect(
+            self.screen, (230, 50, 30),
+            (meter_x, meter_y, meter_width * danger // 100, meter_height)
+        )
+
+        danger_label = self.font.render(
+            f"DANGER: {danger}%", True, (255, 255, 255)
+        )
+        self.screen.blit(danger_label, (220, 40))
+
+        if self.surge_active:
+            surge_label = self.font.render(
+                "LAVA SURGE!", True, (255, 80, 40)
+            )
+            self.screen.blit(surge_label, (10, 75))
 
         if self.game_over:
             self._msg("LAVA GOT YOU!", (220, 80, 40))
